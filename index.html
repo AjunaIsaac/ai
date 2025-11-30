@@ -439,7 +439,7 @@
             const isFirstMessage = chatContainer.querySelectorAll('.message').length <= 2; // User and AI's first response
             const greetings = ['hi', 'hello', 'hey', 'greetings', 'yo'];
             if (appMode === 'normal' && isFirstMessage && greetings.includes(userText.trim().toLowerCase())) {
-                const cannedResponse = "Hi there! I'm Isaac, your AI assistant. How can I help you today?";
+                const cannedResponse = "Hi there! I'm Isaac, your assistant. How can I help you today?";
                 addMessage(cannedResponse, 'ai');
                 return; // Stop here, no API call needed
             }
