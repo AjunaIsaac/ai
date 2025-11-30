@@ -292,8 +292,9 @@
     <div class="top-bar">
         <div class="model-select-wrapper">
             <select id="modelSelector">
-                <option value="gemini-1.0-pro-latest" selected>⚡ Faster (Flash)</option>
-                <option value="gemini-1.5-pro-latest">🧠 Pro Version</option>
+                <!-- YOUR ORIGINAL, WORKING MODEL NAMES -->
+                <option value="gemini-2.0-flash" selected>⚡ Faster (Flash)</option>
+                <option value="gemini-2.5-pro">🧠 Pro Version</option>
             </select>
         </div>
     </div>
@@ -329,11 +330,11 @@
   <script>
     document.addEventListener('DOMContentLoaded', () => {
         // --- NO API KEY HERE ---
-        let currentModel = "gemini-1.0-pro-latest"; 
+        let currentModel = "gemini-2.0-flash"; // Set initial model from your original code
 
         // --- STATE MANAGEMENT ---
-        let appMode = 'normal'; // 'normal', 'json_start', 'json_count_wait', 'json_processing'
-        let storedBaseUrl = ""; // To store the single link if user wants to generate more
+        let appMode = 'normal'; 
+        let storedBaseUrl = ""; 
 
         // --- DOM ---
         const welcomeScreen = document.getElementById('welcomeScreen');
@@ -429,7 +430,7 @@
 
         // --- CORE LOGIC ---
         async function sendMessage(text) {
-            const userText = text; // Keep original for display
+            const userText = text;
             addMessage(userText, 'user');
             userInput.value = '';
             userInput.style.height = 'auto';
@@ -501,7 +502,6 @@
             }
 
             try {
-                // Construct the payload for our secure backend function
                 const payload = {
                     model: currentModel,
                     contents: [{
@@ -512,7 +512,6 @@
                     }]
                 };
 
-                // Call our OWN secure backend function, not Google's API directly
                 const response = await fetch('/generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
