@@ -12,7 +12,7 @@
             --ai-bubble: #000000;
             --text-color: #e3e3e3;
             --accent-color: #a8c7fa; 
-            --gradient-1: #4285f4;
+            --gradient-1: #06750c;
             --gradient-2: #9b72cb;
             --font-family: 'Google Sans', Roboto, sans-serif;
             --code-bg: #121212;
@@ -77,7 +77,7 @@
         .greeting {
             font-size: 3rem;
             font-weight: 500;
-            background: linear-gradient(90deg, #4285f4, #d96570);
+            background: linear-gradient(90deg, #676e03, #d96570);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             margin-bottom: 0.5rem;
@@ -333,8 +333,8 @@
         let currentModel = "gemini-2.0-flash"; // Set initial model from your original code
 
         // --- STATE MANAGEMENT ---
-        let appMode = 'normal'; 
-        let storedBaseUrl = ""; 
+        let appMode = 'normal';
+        let storedBaseUrl = "";
 
         // --- DOM ---
         const welcomeScreen = document.getElementById('welcomeScreen');
@@ -351,7 +351,7 @@
         userInput.addEventListener('input', function() {
             this.style.height = 'auto';
             this.style.height = (this.scrollHeight) + 'px';
-            if(this.value === '') this.style.height = 'auto';
+            if (this.value === '') this.style.height = 'auto';
         });
 
         // --- FORMATTING ---
@@ -407,7 +407,7 @@
 
         // --- URL GENERATION LOGIC ---
         function generateUrls(baseUrl, count) {
-            const regex = /(.*S\d+E)(\d+)(.*)/i; 
+            const regex = /(.*S\d+E)(\d+)(.*)/i;
             const match = baseUrl.match(regex);
 
             if (match) {
@@ -424,7 +424,7 @@
                 }
                 return urls.join('\n');
             } else {
-                return null; 
+                return null;
             }
         }
 
@@ -434,6 +434,15 @@
             addMessage(userText, 'user');
             userInput.value = '';
             userInput.style.height = 'auto';
+
+            // 1. HANDLE PROFESSIONAL GREETING ON FIRST INTERACTION
+            const isFirstMessage = chatContainer.querySelectorAll('.message').length <= 2; // User and AI's first response
+            const greetings = ['hi', 'hello', 'hey', 'greetings', 'yo'];
+            if (appMode === 'normal' && isFirstMessage && greetings.includes(userText.trim().toLowerCase())) {
+                const cannedResponse = "Hi there! I'm Isaac, your AI assistant. How can I help you today?";
+                addMessage(cannedResponse, 'ai');
+                return; // Stop here, no API call needed
+            }
 
             const thinkingDiv = document.createElement('div');
             thinkingDiv.className = 'message ai';
@@ -445,15 +454,41 @@
             let payloadText = userText;
             let systemPrompt = "";
 
-            // --- 1. HANDLING THE EPISODE COUNT INPUT ---
-            if (appMode === 'json_count_wait') {
+            // 2. HANDLE "GENERATE JSON" FLOW
+            if (appMode === 'json_start') {
+                const containsLink = payloadText.toLowerCase().includes('http');
+                
+                // Case A: User provides links (single or multiple)
+                if (containsLink) {
+                    const lines = payloadText.trim().split(/\n/);
+                    if (lines.length === 1 && /(S\d+E\d+)/i.test(payloadText)) {
+                        storedBaseUrl = payloadText.trim();
+                        appMode = 'json_count_wait';
+                        document.getElementById('thinking').remove();
+                        addMessage(`I see a single link. How many episodes should I generate based on this?`, 'ai');
+                        return;
+                    } else {
+                        appMode = 'json_processing';
+                    }
+                // Case B: User provides a message with NO links
+                } else {
+                    systemPrompt = `
+                        You are Isaac, a helpful AI assistant. 
+                        The user has clicked "Generate JSON" but has not provided any data like URLs. Instead, they sent a message.
+                        Your task is to politely ask them what kind of JSON they want to create and to provide the necessary information for it.
+                        Example response: "To generate a JSON file, I need some data. What information should I include?"
+                        Keep your response concise.`;
+                    // Let the normal API call handle this, but keep the mode as 'json_start'
+                }
+            
+            // 3. HANDLE EPISODE COUNT INPUT
+            } else if (appMode === 'json_count_wait') {
                 const count = parseInt(payloadText);
                 if (!isNaN(count) && count > 0) {
                     const generatedList = generateUrls(storedBaseUrl, count);
                     if (generatedList) {
                         payloadText = generatedList;
                         appMode = 'json_processing';
-                        
                         const updateMsg = document.createElement('div');
                         updateMsg.className = 'message ai';
                         updateMsg.innerHTML = `<span class="ai-label">✨ ISAAC</span>Generating ${count} links and preparing to convert to JSON...`;
@@ -470,35 +505,24 @@
                 }
             }
 
-            // --- 2. HANDLING THE INITIAL URL INPUT ---
-            else if (appMode === 'json_start') {
-                const lines = payloadText.trim().split(/\n/);
-                if (lines.length === 1 && payloadText.includes("http") && /(S\d+E\d+)/i.test(payloadText)) {
-                    storedBaseUrl = payloadText.trim();
-                    appMode = 'json_count_wait';
-                    document.getElementById('thinking').remove();
-                    addMessage(`I see a single link. How many episodes should I generate based on this?`, 'ai');
-                    return;
-                } else {
-                    appMode = 'json_processing';
+            // 4. SETTING SYSTEM PROMPTS (if not already set)
+            if (!systemPrompt) {
+                if (appMode === 'json_processing') {
+                    systemPrompt = `
+                        You are a Data Extraction Engine.
+                        Your task is to convert the provided list of video URLs into a strict JSON format.
+                        The required JSON structure is: [{"season_number": 1, "episodes": [{"episode_number": 1, "title": "Cleaned Title", "videoUrl": "Link", "overview": ""}]}]
+                        Rules:
+                        1. You must only output a valid JSON code block.
+                        2. Do not include any conversational text or explanations.`;
+                } else { // Normal chat mode
+                    systemPrompt = `
+                        Your name is Isaac. You are a highly intelligent and friendly AI assistant.
+                        Rules:
+                        1. If the user asks for code, format it using markdown.
+                        2. If the user provides a list of URLs but did not explicitly ask for JSON, simply acknowledge them.
+                        3. Be professional and concise.`;
                 }
-            }
-
-            // --- 3. SETTING SYSTEM PROMPTS ---
-            if (appMode === 'json_processing' || appMode === 'json_start') {
-                systemPrompt = `
-                    You are a Data Extraction Engine.
-                    Your task is to convert the provided list of video URLs into a strict JSON format.
-                    The required JSON structure is: [{"season_number": 1, "episodes": [{"episode_number": 1, "title": "Cleaned Title", "videoUrl": "Link", "overview": ""}]}]
-                    Rules:
-                    1. You must only output a valid JSON code block.
-                    2. Do not include any conversational text, greetings, or explanations.`;
-            } else {
-                systemPrompt = `
-                    Your name is Isaac. You are a highly intelligent and friendly AI assistant.
-                    Rules:
-                    1. If the user asks for code, format it using markdown.
-                    2. If the user provides a list of URLs but did not explicitly ask for JSON, simply acknowledge them.`;
             }
 
             try {
@@ -536,11 +560,11 @@
                 addMessage(reply, 'ai');
 
                 if (appMode === 'json_processing') {
-                    appMode = 'normal'; 
+                    appMode = 'normal';
                 }
 
             } catch (error) {
-                if(document.getElementById('thinking')) document.getElementById('thinking').remove();
+                if (document.getElementById('thinking')) document.getElementById('thinking').remove();
                 addMessage("An error occurred: " + error.message, 'ai');
             }
         }
@@ -550,7 +574,7 @@
             appMode = 'json_start';
             welcomeScreen.classList.add('hidden');
             chatContainer.style.display = 'flex';
-            addMessage("Please paste the video URLs.", 'ai');
+            addMessage("Please paste the video URLs or describe the JSON you need.", 'ai'); // Updated prompt
         });
 
         btnWriteAnything.addEventListener('click', () => {
@@ -562,17 +586,17 @@
 
         sendBtn.addEventListener('click', () => {
             const text = userInput.value.trim();
-            if(!text) return;
+            if (!text) return;
             sendMessage(text);
         });
 
         userInput.addEventListener('keydown', (e) => {
-            if(e.key === 'Enter' && !e.shiftKey) { 
-                e.preventDefault(); 
-                sendBtn.click(); 
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendBtn.click();
             }
         });
     });
-  </script>
+</script>
 </body>
 </html>
